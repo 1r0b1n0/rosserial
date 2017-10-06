@@ -44,11 +44,14 @@ int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "rosserial_server_socket_node");
 
-  int port;
+  int port, buffer_size;
+  bool tcp_nodelay;
   ros::param::param<int>("~port", port, 11411);
+  ros::param::param<int>("~buffer_size", buffer_size, 1023);
+  ros::param::param<bool>("~tcp_nodelay", tcp_nodelay, true);
 
   boost::asio::io_service io_service;
-  rosserial_server::TcpServer<> tcp_server(io_service, port);
+  rosserial_server::TcpServer<> tcp_server(io_service, port, (size_t)buffer_size, tcp_nodelay);
 
   ROS_INFO_STREAM("Listening for rosserial TCP connections on port " << port);
   io_service.run();

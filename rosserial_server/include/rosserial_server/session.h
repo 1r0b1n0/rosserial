@@ -60,12 +60,13 @@ template<typename Socket>
 class Session : boost::noncopyable
 {
 public:
-  Session(boost::asio::io_service& io_service)
-    : socket_(io_service),
+  Session(boost::asio::io_service& io_service, size_t buffer_size=1023)
+    : io_service_(io_service),
+      socket_(io_service),
       sync_timer_(io_service),
       require_check_timer_(io_service),
       ros_spin_timer_(io_service),
-      async_read_buffer_(socket_, buffer_max,
+      async_read_buffer_(socket_, buffer_size,
                          boost::bind(&Session::read_failed, this,
                                      boost::asio::placeholders::error))
   {
@@ -76,6 +77,14 @@ public:
     require_check_interval_ = boost::posix_time::milliseconds(1000);
     ros_spin_interval_ = boost::posix_time::milliseconds(10);
     require_param_name_ = "~require";
+
+    // get msg length param
+    msg_length_bytes_ = ros::param::param("~msg_length_bytes", 2);
+    if(msg_length_bytes_ != 2 && msg_length_bytes_ != 4)
+    {
+      ROS_FATAL_STREAM("Unsupported msg_length_bytes parameter : " << msg_length_bytes_);
+      exit(-1);
+    }
 
     nh_.setCallbackQueue(&ros_callback_queue_);
 
@@ -166,6 +175,10 @@ private:
       ros_spin_timer_.async_wait(boost::bind(&Session::ros_spin_timeout, this,
                                              boost::asio::placeholders::error));
     }
+    else
+    {
+      io_service_.stop();
+    }
   }
 
   //// RECEIVING MESSAGES ////
@@ -189,18 +202,28 @@ private:
     uint8_t sync;
     stream >> sync;
     if (sync == 0xfe) {
-      async_read_buffer_.read(5, boost::bind(&Session::read_id_length, this, _1));
+      async_read_buffer_.read(3+msg_length_bytes_, boost::bind(&Session::read_id_length, this, _1));
     } else {
       read_sync_header();
     }
   }
 
   void read_id_length(ros::serialization::IStream& stream) {
-    uint16_t topic_id, length;
+    uint16_t topic_id;
+    uint32_t length;
     uint8_t length_checksum;
 
     // Check header checksum byte for length field.
-    stream >> length >> length_checksum;
+    if(msg_length_bytes_ == 2)
+    {
+        uint16_t l;
+        stream >> l;
+        length = l;
+    }else if(msg_length_bytes_ == 4){
+        stream >> length;
+    }
+
+    stream >> length_checksum;
     if (length_checksum + checksum(length) != 0xff) {
       uint8_t csl = checksum(length);
       ROS_WARN("Bad message header length checksum. Dropping message from client. T%d L%d C%d %d", topic_id, length, length_checksum, csl);
@@ -262,7 +285,7 @@ private:
   //// SENDING MESSAGES ////
 
   void write_message(Buffer& message, const uint16_t topic_id) {
-    uint8_t overhead_bytes = 8;
+    uint8_t overhead_bytes = 6+msg_length_bytes_;
     uint16_t length = overhead_bytes + message.size();
     BufferPtr buffer_ptr(new Buffer(length));
 
@@ -270,8 +293,15 @@ private:
     ros::serialization::IStream checksum_stream(message.size() > 0 ? &message[0] : NULL, message.size());
 
     ros::serialization::OStream stream(&buffer_ptr->at(0), buffer_ptr->size());
-    uint8_t msg_len_checksum = 255 - checksum(message.size());
-    stream << (uint16_t)0xfeff << (uint16_t)message.size() << msg_len_checksum << topic_id;
+    uint8_t msg_len_checksum = 255 - checksum((uint32_t)message.size());
+    stream << (uint16_t)0xfeff;
+
+    if(msg_length_bytes_ == 2)
+        stream << (uint16_t)message.size();
+    else if(msg_length_bytes_ == 4)
+        stream << (uint32_t)message.size();
+
+    stream << msg_len_checksum << topic_id;
     msg_checksum = 255 - (checksum(checksum_stream) + checksum(topic_id));
 
     memcpy(stream.advance(message.size()), &message[0], message.size());
@@ -383,6 +413,10 @@ private:
     return (val >> 8) + val;
   }
 
+  static uint8_t checksum(uint32_t val) {
+    return (val >> 24) + (val >> 16) + (val >> 8) + val;
+  }
+
   //// RECEIVED MESSAGE HANDLERS ////
 
   void setup_publisher(ros::serialization::IStream& stream) {
@@ -482,9 +516,9 @@ private:
     set_sync_timeout(timeout_interval_);
   }
 
+  boost::asio::io_service& io_service_;
   Socket socket_;
   AsyncReadBuffer<Socket> async_read_buffer_;
-  enum { buffer_max = 1023 };
   bool active_;
 
   ros::NodeHandle nh_;
@@ -498,6 +532,7 @@ private:
   boost::asio::deadline_timer require_check_timer_;
   boost::asio::deadline_timer ros_spin_timer_;
   std::string require_param_name_;
+  int msg_length_bytes_; // number of bytes of the message length integer
 
   std::map<uint16_t, boost::function<void(ros::serialization::IStream&)> > callbacks_;
   std::map<uint16_t, PublisherPtr> publishers_;

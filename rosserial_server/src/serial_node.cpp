@@ -46,11 +46,13 @@ int main(int argc, char* argv[])
 
   std::string port;
   int baud;
+  int buffer_size;
   ros::param::param<std::string>("~port", port, "/dev/ttyACM0");
   ros::param::param<int>("~baud", baud, 57600);
+  ros::param::param<int>("~buffer_size", buffer_size, 1023);
 
   boost::asio::io_service io_service;
-  rosserial_server::SerialSession serial_session(io_service, port, baud);
+  rosserial_server::SerialSession serial_session(io_service, port, baud, buffer_size);
   io_service.run();
   return 0;
 }

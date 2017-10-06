@@ -54,8 +54,9 @@ class UdpSocketSession : public Session<UdpStream>
 public:
   UdpSocketSession(boost::asio::io_service& io_service,
                    udp::endpoint server_endpoint,
-                   udp::endpoint client_endpoint)
-    : Session(io_service), timer_(io_service),
+                   udp::endpoint client_endpoint,
+                   size_t buffer_size)
+    : Session(io_service, buffer_size), timer_(io_service),
       server_endpoint_(server_endpoint), client_endpoint_(client_endpoint)
   {
     ROS_INFO_STREAM("rosserial_server UDP session created between " << server_endpoint << " and " << client_endpoint);

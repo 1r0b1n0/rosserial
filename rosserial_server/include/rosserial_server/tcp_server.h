@@ -52,9 +52,11 @@ template< typename Session = rosserial_server::Session<tcp::socket> >
 class TcpServer
 {
 public:
-  TcpServer(boost::asio::io_service& io_service, short port)
+  TcpServer(boost::asio::io_service& io_service, short port, size_t buffer_size, bool tcp_nodelay)
     : io_service_(io_service),
-      acceptor_(io_service, tcp::endpoint(tcp::v4(), port))
+      acceptor_(io_service, tcp::endpoint(tcp::v4(), port)),
+      buffer_size_(buffer_size),
+      tcp_nodelay_(tcp_nodelay)
   {
     start_accept();
   }
@@ -62,7 +64,7 @@ public:
 private:
   void start_accept()
   {
-    Session* new_session = new Session(io_service_);
+    Session* new_session = new Session(io_service_, buffer_size_);
     acceptor_.async_accept(new_session->socket(),
         boost::bind(&TcpServer::handle_accept, this, new_session,
           boost::asio::placeholders::error));
@@ -73,6 +75,11 @@ private:
   {
     if (!error)
     {
+      if(tcp_nodelay_)
+      {
+        boost::asio::ip::tcp::no_delay option(true);
+        new_session->socket().set_option(option);
+      }
       new_session->start();
     }
     else
@@ -83,8 +90,11 @@ private:
     start_accept();
   }
 
+  size_t buffer_size_;
+
   boost::asio::io_service& io_service_;
   tcp::acceptor acceptor_;
+  bool tcp_nodelay_;
 };
 
 }  // namespace

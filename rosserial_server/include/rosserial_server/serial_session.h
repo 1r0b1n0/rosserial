@@ -48,8 +48,8 @@ namespace rosserial_server
 class SerialSession : public Session<boost::asio::serial_port>
 {
 public:
-  SerialSession(boost::asio::io_service& io_service, std::string port, int baud)
-    : Session(io_service), port_(port), baud_(baud), timer_(io_service)
+  SerialSession(boost::asio::io_service& io_service, std::string port, int baud, size_t buffer_size)
+    : Session(io_service, buffer_size), port_(port), baud_(baud), timer_(io_service)
   {
     ROS_INFO_STREAM("rosserial_server session configured for " << port_ << " at " << baud << "bps.");
 

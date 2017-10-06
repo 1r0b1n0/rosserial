@@ -49,16 +49,19 @@ int main(int argc, char* argv[])
 
   int server_port;
   int client_port;
+  int buffer_size;
   std::string client_addr;
   ros::param::param<int>("~server_port", server_port, 11411);
   ros::param::param<int>("~client_port", client_port, 11411);
   ros::param::param<std::string>("~client_addr", client_addr, "127.0.0.1");
+  ros::param::param<int>("~buffer_size", buffer_size, 1023);
 
   boost::asio::io_service io_service;
   rosserial_server::UdpSocketSession udp_socket_session(
       io_service,
       udp::endpoint(udp::v4(), server_port),
-      udp::endpoint(address::from_string(client_addr), client_port));
+      udp::endpoint(address::from_string(client_addr), client_port),
+      buffer_size);
   io_service.run();
 
   return 0;
