@@ -286,7 +286,7 @@ private:
 
   void write_message(Buffer& message, const uint16_t topic_id) {
     uint8_t overhead_bytes = 6+msg_length_bytes_;
-    uint16_t length = overhead_bytes + message.size();
+    uint32_t length = overhead_bytes + message.size();
     BufferPtr buffer_ptr(new Buffer(length));
 
     uint8_t msg_checksum;
@@ -403,7 +403,7 @@ private:
 
   static uint8_t checksum(ros::serialization::IStream& stream) {
     uint8_t sum = 0;
-    for (uint16_t i = 0; i < stream.getLength(); ++i) {
+    for (uint32_t i = 0; i < stream.getLength(); ++i) {
       sum += stream.getData()[i];
     }
     return sum;

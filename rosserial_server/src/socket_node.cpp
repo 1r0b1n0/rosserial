@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
   bool tcp_nodelay;
   ros::param::param<int>("~port", port, 11411);
   ros::param::param<int>("~buffer_size", buffer_size, 1023);
-  ros::param::param<bool>("~tcp_nodelay", tcp_nodelay, true);
+  ros::param::param<bool>("~tcp_nodelay", tcp_nodelay, false);
 
   boost::asio::io_service io_service;
   rosserial_server::TcpServer<> tcp_server(io_service, port, (size_t)buffer_size, tcp_nodelay);
