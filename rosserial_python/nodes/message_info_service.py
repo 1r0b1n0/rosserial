@@ -63,6 +63,10 @@ class MessageInfoService(object):
     if not self.message_cache.has_key(package_message):
       rospy.loginfo("Loading module to return info on %s/%s." % package_message)
       msg = load_message(*package_message)
+      if msg._full_text == "":
+        # fix for "Advertising on topic [/topic_name] with an empty message definition. warning"
+        # see https://github.com/ros/ros_comm/issues/344
+        msg._full_text = "\n"
       self.message_cache[package_message] = (msg._md5sum, msg._full_text)
     else:
       rospy.loginfo("Returning info from cache on %s/%s." % package_message)
