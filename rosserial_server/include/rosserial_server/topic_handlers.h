@@ -167,16 +167,24 @@ public:
     // deserialize request message
     ros::serialization::Serializer<topic_tools::ShapeShifter>::read(stream, request_message_);
 
+    std::vector<uint8_t> buffer;
     // perform service call
-    // note that at present, at least for rosserial-windows a service call returns nothing,
-    // so we discard the return value of this call() invocation.
-    service_client_.call(request_message_, response_message_, service_md5_);
-
+    if(service_client_.call(request_message_, response_message_, service_md5_))
+    {
+        size_t length = ros::serialization::serializationLength(response_message_);
+        buffer.resize(length+1); // +1 because add a byte
+        // Set first byte to 1 on success
+        buffer[0] = 0x1;
+        ros::serialization::OStream ostream(buffer.data()+1, length);
+        ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, response_message_);
+    }
+    else
+    {
+        ROS_WARN_STREAM("Call to service " << service_client_.getService() << " failed");
+        // Set first byte to 0 on failure
+        buffer = {0x0};
+    }
     // write service response over the wire
-    size_t length = ros::serialization::serializationLength(response_message_);
-    std::vector<uint8_t> buffer(length);
-    ros::serialization::OStream ostream(&buffer[0], length);
-    ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, response_message_);
     write_fn_(buffer,topic_id_);
   }
 
