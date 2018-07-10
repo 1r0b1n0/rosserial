@@ -39,6 +39,7 @@
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
+#include <queue>
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
@@ -71,6 +72,7 @@ public:
                                      boost::asio::placeholders::error))
   {
     active_ = false;
+    writing_ = false;
 
     timeout_interval_ = boost::posix_time::milliseconds(5000);
     attempt_interval_ = boost::posix_time::milliseconds(1000);
@@ -307,9 +309,27 @@ private:
     memcpy(stream.advance(message.size()), &message[0], message.size());
     stream << msg_checksum;
 
-    ROS_DEBUG_NAMED("async_write", "Sending buffer of %d bytes to client.", length);
-    boost::asio::async_write(socket_, boost::asio::buffer(*buffer_ptr),
-          boost::bind(&Session::write_completion_cb, this, boost::asio::placeholders::error, buffer_ptr));
+    // write buffer on socket, or just add it to the queue if busy
+    write_queue_.push(buffer_ptr);
+    if(!writing_)
+    {
+        write_messages_from_queue();
+    }
+  }
+
+  void write_messages_from_queue() {
+      if(write_queue_.empty())
+          return;
+
+      writing_ = true;
+
+      BufferPtr buffer_ptr = write_queue_.back();
+      write_queue_.pop();
+
+      ROS_DEBUG_NAMED("async_write", "Sending buffer of %d bytes to client.", (int)buffer_ptr->size());
+      boost::asio::async_write(socket_, boost::asio::buffer(*buffer_ptr),
+            boost::bind(&Session::write_completion_cb, this, boost::asio::placeholders::error, buffer_ptr));
+
   }
 
   void write_completion_cb(const boost::system::error_code& error,
@@ -323,6 +343,15 @@ private:
         ROS_WARN_STREAM_THROTTLE(1, "Unknown error returned during write operation: " << error);
       }
       stop();
+    }
+    if(write_queue_.empty())
+    {
+        writing_ = false;
+        return;
+    }
+    else
+    {
+        write_messages_from_queue();
     }
     // Buffer is destructed when this function exits and buffer_ptr goes out of scope.
   }
@@ -538,6 +567,9 @@ private:
   std::map<uint16_t, PublisherPtr> publishers_;
   std::map<uint16_t, SubscriberPtr> subscribers_;
   std::map<std::string, ServiceClientPtr> services_;
+
+  bool writing_; // true if write_message is writing
+  std::queue<BufferPtr> write_queue_;
 };
 
 }  // namespace
