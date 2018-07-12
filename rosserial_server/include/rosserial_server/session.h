@@ -323,7 +323,7 @@ private:
 
       writing_ = true;
 
-      BufferPtr buffer_ptr = write_queue_.back();
+      BufferPtr buffer_ptr = write_queue_.front();
       write_queue_.pop();
 
       ROS_DEBUG_NAMED("async_write", "Sending buffer of %d bytes to client.", (int)buffer_ptr->size());
