@@ -32,8 +32,12 @@ target_link_libraries(${PROJECT_NAME}_udp_socket_node ${catkin_LIBRARIES})
 set_target_properties(${PROJECT_NAME}_udp_socket_node PROPERTIES OUTPUT_NAME udp_socket_node PREFIX "")
 add_dependencies(${PROJECT_NAME}_udp_socket_node ${catkin_EXPORTED_TARGETS})
 
+add_executable(topics_service_server src_topics_service_server/main.cpp)
+target_link_libraries(topics_service_server ${catkin_LIBRARIES})
+
+
 install(
-  TARGETS ${PROJECT_NAME}_serial_node ${PROJECT_NAME}_socket_node  ${PROJECT_NAME}_udp_socket_node
+  TARGETS ${PROJECT_NAME}_serial_node ${PROJECT_NAME}_socket_node  ${PROJECT_NAME}_udp_socket_node topics_service_server
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
