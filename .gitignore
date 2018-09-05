@@ -1,3 +1,4 @@
 *.pyc
 *.swp
 rosserial_server/doc/
+*.user*
