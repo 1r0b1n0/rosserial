@@ -3,18 +3,30 @@ project(rosserial_server)
 
 add_definitions(-std=c++11)
 
-find_package(catkin REQUIRED COMPONENTS roscpp rosserial_msgs topic_tools)
-find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rosserial_msgs
+  topic_tools
+)
+
+find_package(Boost REQUIRED COMPONENTS
+  system
+  thread
+)
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp rosserial_msgs topic_tools
+  CATKIN_DEPENDS
+    roscpp
+    rosserial_msgs
+    std_msgs
+    topic_tools
 )
 
 include_directories(
   include
-  ${Boost_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS}
+    ${catkin_INCLUDE_DIRS}
 )
 
 add_executable(${PROJECT_NAME}_serial_node src/serial_node.cpp)
@@ -37,7 +49,11 @@ target_link_libraries(topics_service_server ${catkin_LIBRARIES})
 
 
 install(
-  TARGETS ${PROJECT_NAME}_serial_node ${PROJECT_NAME}_socket_node  ${PROJECT_NAME}_udp_socket_node topics_service_server
+  TARGETS
+    ${PROJECT_NAME}_serial_node
+    ${PROJECT_NAME}_socket_node
+    ${PROJECT_NAME}_udp_socket_node
+    topics_service_server
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
