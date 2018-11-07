@@ -39,6 +39,7 @@
 #include <rosserial_msgs/TopicInfo.h>
 #include <rosserial_msgs/RequestMessageInfo.h>
 #include <rosserial_msgs/RequestServiceInfo.h>
+#include <rosserial_msgs/ServiceCallResult.h>
 #include <topic_tools/shape_shifter.h>
 
 namespace rosserial_server
@@ -168,22 +169,32 @@ public:
     ros::serialization::Serializer<topic_tools::ShapeShifter>::read(stream, request_message_);
 
     std::vector<uint8_t> buffer;
-    // perform service call
-    if(service_client_.call(request_message_, response_message_, service_md5_))
+    if(!service_client_.exists())
     {
-        size_t length = ros::serialization::serializationLength(response_message_);
-        buffer.resize(length+1); // +1 because add a byte
-        // Set first byte to 1 on success
-        buffer[0] = 0x1;
-        ros::serialization::OStream ostream(buffer.data()+1, length);
-        ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, response_message_);
+        ROS_WARN_STREAM("Could not call service " << service_client_.getService() << " because it does not exist");
+        // Set first byte to 2 if service does not exists (yet?)
+        buffer = {rosserial_msgs::ServiceCallResult::NO_EXISTENCE};
     }
     else
     {
-        ROS_WARN_STREAM("Call to service " << service_client_.getService() << " failed");
-        // Set first byte to 0 on failure
-        buffer = {0x0};
+      // perform service call
+      if(service_client_.call(request_message_, response_message_, service_md5_))
+      {
+          size_t length = ros::serialization::serializationLength(response_message_);
+          buffer.resize(length+1); // +1 because add a byte
+          // Set first byte to 1 on success
+          buffer[0] = rosserial_msgs::ServiceCallResult::SUCCESS;
+          ros::serialization::OStream ostream(buffer.data()+1, length);
+          ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, response_message_);
+      }
+      else
+      {
+          ROS_WARN_STREAM("Call to service " << service_client_.getService() << " failed");
+          // Set first byte to 0 on service call failure
+          buffer = {rosserial_msgs::ServiceCallResult::CALL_FAILED};
+      }
     }
+
     // write service response over the wire
     write_fn_(buffer,topic_id_);
   }
