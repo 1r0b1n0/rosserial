@@ -131,17 +131,17 @@ private:
   {
     if (error)
     {
-      read_requested_bytes_ = 0;
-      read_success_callback_.clear();
-      ROS_DEBUG_STREAM_NAMED("async_read", "Read operation failed with: " << error);
-
       if (error == boost::asio::error::operation_aborted)
       {
         // Special case for operation_aborted. The abort callback comes when the owning Session
         // is in the middle of teardown, which means the callback is no longer valid.
+        return;
       }
       else
       {
+        read_requested_bytes_ = 0;
+        read_success_callback_.clear();
+        ROS_DEBUG_STREAM_NAMED("async_read", "Read operation failed with: " << error);
         error_callback_(error);
       }
       return;

@@ -98,6 +98,10 @@ public:
                                            boost::asio::placeholders::error));
   }
 
+  virtual ~Session(){
+
+  }
+
   Socket& socket()
   {
     return socket_;
@@ -127,12 +131,16 @@ public:
 
   void stop()
   {
-    // Abort any pending ROS callbacks.
-    ros_callback_queue_.clear();
+    ROS_INFO_STREAM("Closing client connection");
 
     // Abort active session timer callbacks, if present.
     sync_timer_.cancel();
     require_check_timer_.cancel();
+    ros_spin_timer_.cancel();
+
+    // Abort any pending ROS callbacks.
+    ros_callback_queue_.disable();
+    ros_callback_queue_.clear();
 
     // Reset the state of the session, dropping any publishers or subscribers
     // we currently know about from this client.
@@ -144,6 +152,9 @@ public:
     // Close the socket.
     socket_.close();
     active_ = false;
+
+    io_service_.post([this](){delete this;});
+
   }
 
   bool is_active()
@@ -168,6 +179,9 @@ private:
    * io_service thread to avoid a concurrency nightmare.
    */
   void ros_spin_timeout(const boost::system::error_code& error) {
+    if(error)
+        return;
+
     ros_callback_queue_.callAvailable();
 
     if (ros::ok())
@@ -335,7 +349,12 @@ private:
   void write_completion_cb(const boost::system::error_code& error,
                            BufferPtr buffer_ptr) {
     if (error) {
-      if (error == boost::system::errc::io_error) {
+      if(error == boost::asio::error::operation_aborted)
+      {
+          // aborted, "this" could no longer exist : return immediately
+          return;
+      }
+      else if (error == boost::system::errc::io_error) {
         ROS_WARN_THROTTLE(1, "Socket write operation returned IO error.");
       } else if (error == boost::system::errc::no_such_device) {
         ROS_WARN_THROTTLE(1, "Socket write operation returned no device.");
@@ -344,14 +363,17 @@ private:
       }
       stop();
     }
-    if(write_queue_.empty())
-    {
-        writing_ = false;
-        return;
-    }
     else
     {
-        write_messages_from_queue();
+        if(write_queue_.empty())
+        {
+            writing_ = false;
+            return;
+        }
+        else
+        {
+            write_messages_from_queue();
+        }
     }
     // Buffer is destructed when this function exits and buffer_ptr goes out of scope.
   }
@@ -373,6 +395,9 @@ private:
   }
 
   void sync_timeout(const boost::system::error_code& error) {
+    if(error)
+      return;
+
     if (error != boost::asio::error::operation_aborted) {
       ROS_DEBUG("Sync with device lost.");
       stop();
@@ -393,6 +418,9 @@ private:
   }
 
   void required_topics_check(const boost::system::error_code& error) {
+    if(error)
+      return;
+
     if (error != boost::asio::error::operation_aborted) {
       if (ros::param::has(require_param_name_)) {
         if (!check_set(require_param_name_ + "/publishers", publishers_) ||
