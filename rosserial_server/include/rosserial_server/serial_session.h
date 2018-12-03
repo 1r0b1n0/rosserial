@@ -52,6 +52,7 @@ public:
     : Session(io_service, buffer_size), port_(port), baud_(baud), timer_(io_service)
   {
     ROS_INFO_STREAM("rosserial_server session configured for " << port_ << " at " << baud << "bps.");
+    setDeleteOnStop(false);
 
     failed_connection_attempts_ = 0;
     check_connection();

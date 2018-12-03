@@ -101,6 +101,11 @@ public:
   virtual ~Session(){
 
   }
+  
+  void setDeleteOnStop(bool del)
+  {
+     delete_on_stop_ = del;
+  }
 
   Socket& socket()
   {
@@ -136,10 +141,13 @@ public:
     // Abort active session timer callbacks, if present.
     sync_timer_.cancel();
     require_check_timer_.cancel();
-    ros_spin_timer_.cancel();
+    if(delete_on_stop_)
+    {
+        ros_spin_timer_.cancel();
+    }
+
 
     // Abort any pending ROS callbacks.
-    ros_callback_queue_.disable();
     ros_callback_queue_.clear();
 
     // Reset the state of the session, dropping any publishers or subscribers
@@ -153,7 +161,11 @@ public:
     socket_.close();
     active_ = false;
 
-    io_service_.post([this](){delete this;});
+    if(delete_on_stop_)
+    {
+        ros_callback_queue_.disable();
+        io_service_.post([this](){delete this;});
+    }
 
   }
 
@@ -581,6 +593,7 @@ private:
   ros::NodeHandle nh_;
   ros::CallbackQueue ros_callback_queue_;
 
+  bool delete_on_stop_ = true;
   boost::posix_time::time_duration timeout_interval_;
   boost::posix_time::time_duration attempt_interval_;
   boost::posix_time::time_duration require_check_interval_;
