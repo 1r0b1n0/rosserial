@@ -101,7 +101,7 @@ public:
   virtual ~Session(){
 
   }
-  
+
   void setDeleteOnStop(bool del)
   {
      delete_on_stop_ = del;
@@ -302,6 +302,9 @@ private:
       // No worries. Begin syncing on a new message.
       ROS_WARN("Overrun on receive buffer. Attempting to regain rx sync.");
       read_sync_header();
+    } else if(error == boost::asio::error::operation_aborted) {
+      // aborted, "this" could no longer exist : return immediately
+      return;
     } else if (error) {
       // When some other read error has occurred, stop the session, which destroys
       // all known publishers and subscribers.
